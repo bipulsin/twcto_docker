@@ -51,7 +51,11 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 RUN pip install --upgrade pip setuptools wheel \
-    && sed -i 's/pandas-ta==0.3.14b0/pandas-ta>=0.4.71b0/' backend/requirements.txt \
+    && sed -i \
+        -e 's/pandas-ta==0.3.14b0/pandas-ta>=0.4.71b0/' \
+        -e 's/pandas==2.0.3/pandas>=2.3.3/' \
+        -e 's/numpy==1.24.3/numpy>=2.2.6/' \
+        backend/requirements.txt \
     && pip install -r backend/requirements.txt \
     && pip install torch --index-url https://download.pytorch.org/whl/cpu \
     && pip install -r backend/requirements-ml.txt
