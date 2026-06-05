@@ -1,0 +1,11 @@
+.git
+.github
+README.md
+.env
+.env.*
+*.pem
+db/
+*.dump
+*.dump.gz
+.build
+.DS_Store

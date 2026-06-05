@@ -1,0 +1,13 @@
+# PostgreSQL 16 with production TradeWithCTO schema + data seed.
+# Requires db/trademanthan.dump.gz in build context (see scripts/export-production-db.sh).
+
+FROM postgres:16-bookworm
+
+ENV POSTGRES_DB=trademanthan \
+    POSTGRES_USER=trademanthan \
+    POSTGRES_PASSWORD=trademanthan123
+
+COPY docker/postgres/init-restore.sh /docker-entrypoint-initdb.d/01-restore.sh
+COPY db/trademanthan.dump.gz /docker-entrypoint-initdb.d/trademanthan.dump.gz
+
+RUN chmod +x /docker-entrypoint-initdb.d/01-restore.sh
