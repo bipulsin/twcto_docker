@@ -4,7 +4,7 @@
 ARG TRADEMANTHAN_REPO=https://github.com/bipulsin/trademanthan.git
 ARG TRADEMANTHAN_REF=main
 
-FROM python:3.11-slim-bookworm AS base
+FROM python:3.12-slim-bookworm AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -51,11 +51,12 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 RUN pip install --upgrade pip setuptools wheel \
+    && sed -i 's/pandas-ta==0.3.14b0/pandas-ta>=0.4.71b0/' backend/requirements.txt \
     && pip install -r backend/requirements.txt \
     && pip install torch --index-url https://download.pytorch.org/whl/cpu \
     && pip install -r backend/requirements-ml.txt
 
-FROM python:3.11-slim-bookworm AS runtime
+FROM python:3.12-slim-bookworm AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
