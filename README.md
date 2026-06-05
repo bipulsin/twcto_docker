@@ -43,18 +43,23 @@ On first start, PostgreSQL restores `db/trademanthan.dump.gz` baked into the `tw
 
 ## Build images (with production DB seed)
 
-The database dump and NSE instruments file are **not** stored in git (too large). Build on the EC2 host:
+Seed assets (123 MB DB dump + NSE instruments JSON) are published as a GitHub Release:
+
+- [seed-2026-06-05](https://github.com/bipulsin/twcto_docker/releases/tag/seed-2026-06-05)
+
+CI builds and pushes all three images to GHCR on every push to `main`. To rebuild manually on EC2:
 
 ```bash
-# On EC2 (has PostgreSQL + instruments JSON)
 git clone https://github.com/bipulsin/twcto_docker.git
 cd twcto_docker
-./scripts/export-production-db.sh
+./scripts/export-production-db.sh   # or download release assets into db/ + data/
 
 export GITHUB_TOKEN=<PAT with write:packages>
 docker login ghcr.io -u bipulsin
 ./scripts/build-and-push.sh latest
 ```
+
+After the first CI run, make packages **public** under GitHub → Packages → Package settings → Change visibility (if `docker pull` returns 403).
 
 ## Configuration
 

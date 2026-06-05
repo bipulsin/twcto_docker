@@ -10,6 +10,10 @@ on:
         description: trademanthan git ref to build
         required: false
         default: main
+      seed_tag:
+        description: GitHub release tag with DB + instruments assets
+        required: false
+        default: seed-2026-06-05
 
 permissions:
   contents: read
@@ -18,11 +22,37 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/bipulsin
+  SEED_TAG: ${{ github.event.inputs.seed_tag || 'seed-2026-06-05' }}
 
 jobs:
+  prepare-seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download production seed assets
+        run: |
+          mkdir -p db data/instruments
+          curl -fL -o db/trademanthan.dump.gz \
+            "https://github.com/bipulsin/twcto_docker/releases/download/${SEED_TAG}/trademanthan.dump.gz"
+          curl -fL -o data/instruments/nse_instruments.json \
+            "https://github.com/bipulsin/twcto_docker/releases/download/${SEED_TAG}/nse_instruments.json"
+          ls -lh db/trademanthan.dump.gz data/instruments/nse_instruments.json
+
+      - name: Upload seed build context
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-seed-context
+          path: |
+            db/trademanthan.dump.gz
+            data/instruments/nse_instruments.json
+          retention-days: 2
+
   build-and-push:
+    needs: prepare-seed
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - name: app
@@ -31,9 +61,17 @@ jobs:
           - name: nginx
             file: Dockerfile.nginx
             image: twcto-nginx
+          - name: postgres
+            file: Dockerfile.postgres
+            image: twcto-postgres
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download seed build context
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-seed-context
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -66,6 +104,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             TRADEMANTHAN_REF=${{ github.event.inputs.trademanthan_ref || 'main' }}
-
-  # Postgres image requires a production DB dump in db/trademanthan.dump.gz.
-  # Build that image on EC2 via scripts/build-and-push.sh, or attach the dump as a CI secret artifact.
