@@ -47,7 +47,14 @@ Seed assets (123 MB DB dump + NSE instruments JSON) are published as a GitHub Re
 
 - [seed-2026-06-05](https://github.com/bipulsin/twcto_docker/releases/tag/seed-2026-06-05)
 
-CI builds and pushes all three images to GHCR on every push to `main`. To rebuild manually on EC2:
+CI builds and pushes **multi-arch** (`linux/amd64` + `linux/arm64`) images to GHCR on:
+
+- every push to `twcto_docker` `main`
+- `repository_dispatch` event `trademanthan-updated` (from TradeManthan release scripts)
+
+**paperclip-vm** (arm64) deploy: `REBUILD=0 docker compose pull app nginx` (~1 min).
+
+To rebuild manually:
 
 ```bash
 git clone https://github.com/bipulsin/twcto_docker.git

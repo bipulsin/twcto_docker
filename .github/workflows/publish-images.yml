@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  repository_dispatch:
+    types: [trademanthan-updated]
   workflow_dispatch:
     inputs:
       trademanthan_ref:
@@ -23,6 +25,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/bipulsin
   SEED_TAG: ${{ github.event.inputs.seed_tag || 'seed-2026-06-05' }}
+  TRADEMANTHAN_REF: ${{ github.event.client_payload.ref || github.event.inputs.trademanthan_ref || 'main' }}
 
 jobs:
   prepare-seed:
@@ -94,13 +97,16 @@ jobs:
             type=semver,pattern={{version}}
             type=sha,prefix=
 
-      - name: Build and push ${{ matrix.name }}
+      - name: Build and push ${{ matrix.name }} (amd64 + arm64)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.file }}
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           build-args: |
-            TRADEMANTHAN_REF=${{ github.event.inputs.trademanthan_ref || 'main' }}
+            TRADEMANTHAN_REF=${{ env.TRADEMANTHAN_REF }}
