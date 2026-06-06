@@ -66,6 +66,7 @@ services:
     volumes:
       - twcto_logs:/app/logs
       - twcto_inbox:/app/inbox
+      - ./data:/home/ubuntu/trademanthan/data
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
       interval: 30s
