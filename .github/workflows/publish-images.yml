@@ -110,3 +110,5 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           build-args: |
             TRADEMANTHAN_REF=${{ env.TRADEMANTHAN_REF }}
+            APP_SRC_REV=${{ env.TRADEMANTHAN_REF }}
+            FRONTEND_SRC_REV=${{ env.TRADEMANTHAN_REF }}

@@ -45,6 +45,7 @@ services:
       dockerfile: Dockerfile.app
       args:
         TRADEMANTHAN_REF: ${TRADEMANTHAN_REF:-main}
+        APP_SRC_REV: ${APP_SRC_REV:-${TRADEMANTHAN_REF:-main}}
     restart: unless-stopped
     env_file:
       - .env
@@ -81,6 +82,7 @@ services:
       dockerfile: Dockerfile.nginx
       args:
         TRADEMANTHAN_REF: ${TRADEMANTHAN_REF:-main}
+        FRONTEND_SRC_REV: ${FRONTEND_SRC_REV:-${TRADEMANTHAN_REF:-main}}
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-8080}:80"

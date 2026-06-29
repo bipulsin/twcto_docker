@@ -3,6 +3,8 @@
 
 ARG TRADEMANTHAN_REPO=https://github.com/bipulsin/trademanthan.git
 ARG TRADEMANTHAN_REF=main
+# Cache-bust: trademanthan commit SHA (see FRONTEND_SRC_REV in Dockerfile.nginx).
+ARG APP_SRC_REV=${TRADEMANTHAN_REF}
 
 FROM python:3.12-slim-bookworm AS base
 
@@ -27,8 +29,15 @@ FROM base AS app-src
 
 ARG TRADEMANTHAN_REPO
 ARG TRADEMANTHAN_REF
+ARG APP_SRC_REV
 
-RUN git clone --depth 1 --branch "${TRADEMANTHAN_REF}" "${TRADEMANTHAN_REPO}" /tmp/src \
+RUN echo "app-src-rev=${APP_SRC_REV}" \
+    && git init /tmp/src \
+    && cd /tmp/src \
+    && git remote add origin "${TRADEMANTHAN_REPO}" \
+    && git fetch --depth 1 origin "${TRADEMANTHAN_REF}" \
+    && git checkout FETCH_HEAD \
+    && cd / \
     && rsync -a \
         --exclude='.git' \
         --exclude='.venv*' \

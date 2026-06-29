@@ -2,16 +2,26 @@
 
 ARG TRADEMANTHAN_REPO=https://github.com/bipulsin/trademanthan.git
 ARG TRADEMANTHAN_REF=main
+# Cache-bust token: pass trademanthan commit SHA (release script / deploy does this).
+# When this changes, Docker re-clones frontend even if TRADEMANTHAN_REF stays "main".
+ARG FRONTEND_SRC_REV=${TRADEMANTHAN_REF}
 
 FROM alpine:3.20 AS frontend-src
 
 ARG TRADEMANTHAN_REPO
 ARG TRADEMANTHAN_REF
+ARG FRONTEND_SRC_REV
 
 RUN apk add --no-cache git rsync \
-    && git clone --depth 1 --branch "${TRADEMANTHAN_REF}" "${TRADEMANTHAN_REPO}" /tmp/src \
+    && echo "frontend-src-rev=${FRONTEND_SRC_REV}" \
+    && git init /tmp/src \
+    && cd /tmp/src \
+    && git remote add origin "${TRADEMANTHAN_REPO}" \
+    && git fetch --depth 1 origin "${TRADEMANTHAN_REF}" \
+    && git checkout FETCH_HEAD \
     && mkdir -p /frontend \
-    && rsync -a /tmp/src/frontend/public/ /frontend/ \
+    && rsync -a frontend/public/ /frontend/ \
+    && cd / \
     && rm -rf /tmp/src
 
 FROM nginx:1.27-alpine
