@@ -10,7 +10,16 @@ Docker packaging for [tradewithcto.com](https://www.tradewithcto.com) — FastAP
 | `ghcr.io/bipulsin/twcto-nginx` | Nginx reverse proxy + frontend static assets |
 | `ghcr.io/bipulsin/twcto-postgres` | PostgreSQL 16 with production `trademanthan` database seed |
 
-Application source is cloned from [bipulsin/trademanthan](https://github.com/bipulsin/trademanthan) at build time (`TRADEMANTHAN_REF`, default `main`).
+Application source is cloned from [bipulsin/trademanthan](https://github.com/bipulsin/trademanthan) at build time.
+
+**Important:** CI always resolves the trademanthan ref to a full commit SHA and passes it as
+`TRADEMANTHAN_REF` / `APP_SRC_REV` / `FRONTEND_SRC_REV`. Building with the bare branch name
+`main` plus BuildKit/GHA layer cache can reuse a stale git-clone layer and publish an
+incomplete `:latest` image (this caused a 2026-07-16 outage where `kavach_10m.py` was
+missing after a `REBUILD=0` pull). Post-build sanity checks refuse to publish such images.
+
+paperclip `REBUILD=0` deploy also re-checks core modules after `docker compose pull` and
+aborts before recreate if the pulled image fails the check.
 
 ## Quick start
 

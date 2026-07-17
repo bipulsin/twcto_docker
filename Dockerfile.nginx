@@ -29,6 +29,11 @@ FROM nginx:1.27-alpine
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=frontend-src /frontend /usr/share/nginx/html
 
+# Fail build if frontend clone produced an empty tree (stale/missing src).
+RUN test -f /usr/share/nginx/html/index.html \
+    && test -f /usr/share/nginx/html/dailyRSchecklist.html \
+    && echo "frontend-src sanity OK"
+
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \

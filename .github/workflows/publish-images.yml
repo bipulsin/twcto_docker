@@ -25,9 +25,41 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/bipulsin
   SEED_TAG: ${{ github.event.inputs.seed_tag || 'seed-2026-06-05' }}
-  TRADEMANTHAN_REF: ${{ github.event.client_payload.ref || github.event.inputs.trademanthan_ref || 'main' }}
 
 jobs:
+  # Always resolve branch/tag names to a commit SHA. Building with
+  # TRADEMANTHAN_REF=main + GHA layer cache reuses a stale app-src clone and can
+  # publish GHCR :latest missing files that exist on current main (root cause of
+  # the 2026-07-16 kavach_10m.py outage after REBUILD=0 pull).
+  resolve-ref:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      ref_in: ${{ steps.resolve.outputs.ref_in }}
+    steps:
+      - name: Resolve trademanthan ref → full SHA
+        id: resolve
+        run: |
+          set -euo pipefail
+          REF_IN='${{ github.event.client_payload.ref || github.event.inputs.trademanthan_ref || 'main' }}'
+          REF_IN="${REF_IN:-main}"
+          echo "ref_in=${REF_IN}" >> "$GITHUB_OUTPUT"
+          if [[ "$REF_IN" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            SHA="$REF_IN"
+          else
+            SHA="$(git ls-remote "https://github.com/bipulsin/trademanthan.git" "refs/heads/${REF_IN}" "refs/tags/${REF_IN}" "refs/tags/${REF_IN}^{}" | awk 'NF{print $1; exit}')"
+            if [[ -z "$SHA" ]]; then
+              # bare SHA prefix / other ref
+              SHA="$(git ls-remote "https://github.com/bipulsin/trademanthan.git" "$REF_IN" | awk 'NF{print $1; exit}')"
+            fi
+          fi
+          if [[ -z "$SHA" || ! "$SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::Could not resolve trademanthan ref '${REF_IN}' to a 40-char SHA"
+            exit 1
+          fi
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Resolved trademanthan ${REF_IN} → ${SHA}"
+
   prepare-seed:
     runs-on: ubuntu-latest
     steps:
@@ -52,7 +84,7 @@ jobs:
           retention-days: 2
 
   build-and-push:
-    needs: prepare-seed
+    needs: [resolve-ref, prepare-seed]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -96,6 +128,9 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha,prefix=
+          labels: |
+            org.opencontainers.image.revision=${{ needs.resolve-ref.outputs.sha }}
+            twcto.trademanthan.sha=${{ needs.resolve-ref.outputs.sha }}
 
       - name: Build and push ${{ matrix.name }} (amd64 + arm64)
         uses: docker/build-push-action@v6
@@ -109,6 +144,29 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           build-args: |
-            TRADEMANTHAN_REF=${{ env.TRADEMANTHAN_REF }}
-            APP_SRC_REV=${{ env.TRADEMANTHAN_REF }}
-            FRONTEND_SRC_REV=${{ env.TRADEMANTHAN_REF }}
+            TRADEMANTHAN_REF=${{ needs.resolve-ref.outputs.sha }}
+            APP_SRC_REV=${{ needs.resolve-ref.outputs.sha }}
+            FRONTEND_SRC_REV=${{ needs.resolve-ref.outputs.sha }}
+
+      # Catch incomplete images before paperclip ever pulls them.
+      - name: Post-push sanity check (app, linux/amd64)
+        if: matrix.name == 'app'
+        env:
+          IMAGE: ${{ env.IMAGE_PREFIX }}/twcto-app:latest
+        run: |
+          set -euo pipefail
+          # On non-default branches latest may not exist; prefer the first pushed tag.
+          TAG="$(echo '${{ steps.meta.outputs.tags }}' | head -n1)"
+          IMAGE="${TAG:-$IMAGE}"
+          chmod +x scripts/sanity-check-app-image.sh
+          docker pull --platform linux/amd64 "$IMAGE"
+          IMAGE="$IMAGE" ./scripts/sanity-check-app-image.sh "$IMAGE"
+
+      - name: Post-push sanity check (nginx frontend files)
+        if: matrix.name == 'nginx'
+        run: |
+          set -euo pipefail
+          TAG="$(echo '${{ steps.meta.outputs.tags }}' | head -n1)"
+          docker pull --platform linux/amd64 "$TAG"
+          docker run --rm --entrypoint sh "$TAG" -c \
+            'test -f /usr/share/nginx/html/index.html && test -f /usr/share/nginx/html/dailyRSchecklist.html && echo nginx-src sanity OK'

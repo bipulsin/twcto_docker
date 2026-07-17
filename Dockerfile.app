@@ -88,6 +88,17 @@ WORKDIR ${APP_HOME}
 COPY --from=deps /opt/venv /opt/venv
 COPY --from=app-src ${APP_HOME} ${APP_HOME}
 
+# Guard against stale git-clone layers / incomplete rsync: fail the image build
+# if core modules are missing (seen when GHCR :latest was published without
+# kavach_10m.py because TRADEMANTHAN_REF=main hit a cached app-src layer).
+RUN test -f backend/main.py \
+    && test -f backend/services/kavach_10m.py \
+    && test -f backend/services/kavach_engine.py \
+    && test -f backend/services/daily_checklist_trade_state.py \
+    && test -f backend/services/daily_checklist_chop_gates.py \
+    && python -c "import backend.services.kavach_10m as m; assert m.__file__; import backend.services.kavach_engine" \
+    && echo "app-src sanity OK"
+
 RUN mkdir -p logs data/instruments inbox
 
 COPY docker/app/entrypoint.sh /entrypoint.sh
